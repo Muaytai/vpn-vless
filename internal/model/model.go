@@ -20,3 +20,6 @@ type User struct {
 	CreatedAt time.Time
 	RevokedAt *time.Time
 }
+
+// IsActive reports whether the user has not been revoked.
+func (u User) IsActive() bool { return u.Active && u.RevokedAt == nil }

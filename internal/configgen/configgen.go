@@ -79,10 +79,6 @@ type config struct {
 	Routing   *routing   `json:"routing,omitempty"`
 }
 
-func active(user model.User) bool {
-	return user.Active && user.RevokedAt == nil
-}
-
 // ServerConfig returns a server configuration containing only active users.
 // The returned bytes contain credentials and must be handled as secrets.
 func ServerConfig(s model.Server, users []model.User) ([]byte, error) {
@@ -91,7 +87,7 @@ func ServerConfig(s model.Server, users []model.User) ([]byte, error) {
 	}
 	clients := make([]vlessUser, 0, len(users))
 	for _, user := range users {
-		if active(user) {
+		if user.IsActive() {
 			clients = append(clients, vlessUser{ID: user.UUID, Flow: flow})
 		}
 	}
@@ -145,7 +141,7 @@ func endpoint(s model.Server) (string, error) {
 
 // UserLink returns a credential-bearing VLESS link for an active user.
 func UserLink(s model.Server, user model.User) (string, error) {
-	if !active(user) {
+	if !user.IsActive() {
 		return "", errors.New("user is not active")
 	}
 	host, err := endpoint(s)
@@ -163,7 +159,7 @@ func UserLink(s model.Server, user model.User) (string, error) {
 
 // ClientConfig returns a credential-bearing Xray client configuration.
 func ClientConfig(s model.Server, user model.User, socksPort int) ([]byte, error) {
-	if !active(user) {
+	if !user.IsActive() {
 		return nil, errors.New("user is not active")
 	}
 	host, err := endpoint(s)

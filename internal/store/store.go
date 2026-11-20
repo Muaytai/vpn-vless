@@ -62,6 +62,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("configure database: %w", err)
 	}
+	if _, err := db.Exec(`PRAGMA journal_mode = WAL`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable WAL mode: %w", err)
+	}
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS settings (
 		id INTEGER PRIMARY KEY CHECK (id = 1),
 		endpoint TEXT NOT NULL, port INTEGER NOT NULL, server_name TEXT NOT NULL,

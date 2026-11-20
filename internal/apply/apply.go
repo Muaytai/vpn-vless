@@ -62,7 +62,9 @@ func ensureDir(dir string) error {
 	if err != nil {
 		return fmt.Errorf("inspect config directory: %w", err)
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+	// Lstat returns symlink metadata directly; for a symlink IsDir() is false,
+	// so symlinks are always rejected here without an extra ModeSymlink check.
+	if !info.IsDir() {
 		return errors.New("config directory must be a real directory")
 	}
 	return nil

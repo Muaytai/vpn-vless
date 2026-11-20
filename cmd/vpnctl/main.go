@@ -36,7 +36,8 @@ const help = `vpnctl — управление VLESS + REALITY
   user list         показать имена и состояния пользователей
   user revoke NAME  отозвать пользователя (после этого нужен server apply)
   user link NAME    вывести личную VLESS-ссылку
-  user client NAME  вывести конфигурацию Xray-клиента с SOCKS 127.0.0.1:1080
+  user client [--socks-port PORT] NAME
+                    вывести конфигурацию Xray-клиента (SOCKS, по умолчанию 1080)
   server render     вывести конфигурацию сервера
   server apply      проверить и применить конфигурацию на Linux (нужен root)
 
@@ -162,7 +163,10 @@ func validateCommand(args []string) error {
 		if args[1] == "list" && len(args) == 2 {
 			return nil
 		}
-		if (args[1] == "add" || args[1] == "revoke" || args[1] == "link" || args[1] == "client") && len(args) == 3 && args[2] != "" {
+		if (args[1] == "add" || args[1] == "revoke" || args[1] == "link") && len(args) == 3 && args[2] != "" {
+			return nil
+		}
+		if args[1] == "client" && len(args) >= 3 {
 			return nil
 		}
 	}
@@ -286,22 +290,41 @@ func userCommand(s *store.Store, server model.Server, args []string, out, errOut
 		}
 		_, err := fmt.Fprintln(out, "Пользователь отозван. Доступ действительно отключится только после vpnctl server apply.")
 		return err
-	case "link", "client":
+	case "link":
 		user, err := s.User(args[1])
 		if err != nil {
 			return fmt.Errorf("получить пользователя: %w", err)
 		}
-		if !user.Active || user.RevokedAt != nil {
+		if !user.IsActive() {
 			return errors.New("пользователь отозван; выдача конфигурации запрещена")
 		}
-		if args[0] == "link" {
-			link, err := configgen.UserLink(server, user)
-			if err != nil {
-				return fmt.Errorf("создать ссылку: %w", err)
-			}
-			return printSecret(out, errOut, "VLESS-ссылка содержит секрет; не передавайте её посторонним.", link)
+		link, err := configgen.UserLink(server, user)
+		if err != nil {
+			return fmt.Errorf("создать ссылку: %w", err)
 		}
-		config, err := configgen.ClientConfig(server, user, 1080)
+		return printSecret(out, errOut, "VLESS-ссылка содержит секрет; не передавайте её посторонним.", link)
+	case "client":
+		fs := flag.NewFlagSet("client", flag.ContinueOnError)
+		fs.SetOutput(io.Discard)
+		socksPort := fs.Int("socks-port", 1080, "SOCKS5 proxy port")
+		if err := fs.Parse(args[1:]); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				_, writeErr := io.WriteString(out, help)
+				return writeErr
+			}
+			return errors.New("неверные параметры client; используйте vpnctl --help")
+		}
+		if fs.NArg() != 1 || fs.Arg(0) == "" {
+			return errors.New("неверные параметры client; используйте vpnctl --help")
+		}
+		user, err := s.User(fs.Arg(0))
+		if err != nil {
+			return fmt.Errorf("получить пользователя: %w", err)
+		}
+		if !user.IsActive() {
+			return errors.New("пользователь отозван; выдача конфигурации запрещена")
+		}
+		config, err := configgen.ClientConfig(server, user, *socksPort)
 		if err != nil {
 			return fmt.Errorf("создать конфигурацию клиента: %w", err)
 		}

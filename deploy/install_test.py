@@ -1,11 +1,17 @@
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
 
 
 class InstallRollbackTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not shutil.which('sh'):
+            raise unittest.SkipTest("POSIX shell ('sh') is not available on this platform")
+
     def run_install(self, failure, existing=False, cleanup_failure=False):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)

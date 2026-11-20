@@ -139,6 +139,14 @@ func TestLifecycle(t *testing.T) {
 	if json.Unmarshal([]byte(client.out), &conf) != nil || len(conf.Inbounds) != 1 || conf.Inbounds[0].Listen != "127.0.0.1" || conf.Inbounds[0].Port != 1080 || conf.Inbounds[0].Protocol != "socks" || len(conf.Outbounds) != 1 || conf.Outbounds[0].Settings.ID != alice.UUID || !strings.Contains(client.stderr, "секрет") || strings.Contains(client.out, server.PrivateKey) {
 		t.Fatal("invalid client config or warning")
 	}
+	clientCustom := call("user", "client", "--socks-port", "9050", "bob")
+	requireSuccess(t, clientCustom)
+	if json.Unmarshal([]byte(clientCustom.out), &conf) != nil || conf.Inbounds[0].Port != 9050 {
+		t.Fatal("custom socks port not applied")
+	}
+	if r := call("user", "client", "--socks-port", "abc", "bob"); r.err == nil {
+		t.Fatal("invalid socks port accepted")
+	}
 	render := call("server", "render")
 	requireSuccess(t, render)
 	if !json.Valid([]byte(render.out)) || !strings.Contains(render.out, alice.UUID) || !strings.Contains(render.out, server.PrivateKey) || !strings.Contains(render.stderr, "секрет") {
